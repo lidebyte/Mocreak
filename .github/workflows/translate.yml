@@ -1,0 +1,66 @@
+name: Auto translate README
+
+permissions:
+  contents: write
+
+on:
+  push:
+    paths:
+      - "README.zh-CN.md"
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install deep-translator
+
+      - name: Translate README
+        run: |
+            python <<EOF
+            from deep_translator import GoogleTranslator
+            import re
+
+            source_file = "README.zh-CN.md"
+
+            with open(source_file, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            pattern = r"<!-- translate:start -->(.*?)<!-- translate:end -->"
+            matches = re.findall(pattern, content, re.DOTALL)
+
+            languages = {
+                "README.md": "en",
+                "README.zh-TW.md": "zh-TW",
+                "README.ja.md": "ja",
+                "README.ru.md": "ru",
+                "README.de.md": "de"
+            }
+
+            for filename, lang in languages.items():
+                new_content = content
+                for match in matches:
+                    translated = GoogleTranslator(source='zh-CN', target=lang).translate(match.strip())
+                    new_content = new_content.replace(match, "\n" + translated + "\n")
+
+                with open(filename, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+
+            EOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .
+          git commit -m "README Multi-Language Auto Sync"
+          git push
